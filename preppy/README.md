@@ -1,30 +1,24 @@
-# Preppy 🐷 — Your AI Study Companion
+# Preppy — "Your AI Study Companion"
 
-I built Preppy because while prepping for my own exams, I noticed I was spending more time deciding *what* to study than actually studying. So this exists to kill that decision fatigue.
+An AI-assisted study planner that turns a student's exam date, weekly availability, syllabus, and subject confidence levels into a realistic day-by-day study schedule on a calendar.
 
-You give it your exam date, how many hours you actually have free each day (not just an average), your syllabus broken down subject → topic → subtopic, and how confident you are in each subject. It turns that into a real day-by-day study schedule on a calendar, weighted toward what you're weakest at, with buffer time before the exam so you're not sprinting to the finish line.
+## Tech Stack
 
-## What it actually does
+- **Framework**: React 18 (Vite)
+- **Styling**: Tailwind CSS
+- **Icons**: lucide-react
+- **Persistence**: Browser `localStorage` (no backend, no external API calls required)
 
-- Builds your syllabus manually, unlimited depth (subject → topic → subtopic), fully editable
-- Accounts for recurring commitments (college, work, coaching, gym, whatever) that eat into your study time
-- Schedules individual subtopics, not whole subjects, weighted by how confident you are
-- Auto-slots in revision sessions and mock tests based on what you choose
-- Full calendar view, week or month, click any session to mark it complete, skip it, or reschedule
-- Everything's saved locally, so closing the tab doesn't wipe your plan
+## How to Run Locally
 
-## Stack
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-- React (Vite)
-- Tailwind CSS
-- lucide-react for icons
-- Browser localStorage — no backend, nothing to spin up
+2. Start the local development server:
+   ```bash
+   npm run dev
+   ```
 
-## Running it locally
-
-```bash
-npm install
-npm run dev
-```
-
-That's it. No env vars, no API keys, no backend to configure.
+3. Open your browser at `http://localhost:5173`

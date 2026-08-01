@@ -748,7 +748,7 @@ const CalendarView = ({ schedule, setSchedule, onRegenerate }) => {
   };
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-6rem)]">
+    <div className="flex flex-col">
       {/* Calendar Header */}
       <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex-wrap gap-3">
         <div>
@@ -1111,7 +1111,7 @@ export default function App() {
       </header>
 
       {/* Wizard Content Area */}
-      <main className="flex-1 max-w-3xl w-full mx-auto p-6 md:p-12 overflow-y-auto pb-32">
+      <main className="flex-1 max-w-3xl w-full mx-auto p-6 md:p-12 pb-32">
         {isGenerating ? (
           <div className="h-full flex flex-col items-center justify-center space-y-6 text-center animate-in fade-in duration-500">
             <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center text-4xl animate-pulse">🐷</div>
