@@ -1095,9 +1095,9 @@ export default function App() {
   );
 
   const renderWizard = () => (
-    <div className="min-h-screen bg-slate-50/50 flex flex-col">
+    <div className="h-screen bg-slate-50/50 flex flex-col overflow-hidden">
       {/* Wizard Header Progress */}
-      <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-20">
+      <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shrink-0 z-20">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center text-xl">🐷</div>
           <span className="font-bold text-slate-800 text-lg">Preppy Setup</span>
@@ -1111,7 +1111,7 @@ export default function App() {
       </header>
 
       {/* Wizard Content Area */}
-      <main className="flex-1 max-w-3xl w-full mx-auto p-6 md:p-12 overflow-y-auto pb-32">
+      <main className="flex-1 min-h-0 max-w-3xl w-full mx-auto p-6 md:p-12 overflow-y-auto">
         {isGenerating ? (
           <div className="h-full flex flex-col items-center justify-center space-y-6 text-center animate-in fade-in duration-500">
             <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center text-4xl animate-pulse">🐷</div>
@@ -1132,7 +1132,7 @@ export default function App() {
 
       {/* Wizard Footer Navigation */}
       {!isGenerating && (
-        <footer className="bg-white border-t border-slate-100 p-4 fixed bottom-0 left-0 right-0 z-20">
+        <footer className="bg-white border-t border-slate-100 p-4 shrink-0 z-20">
           <div className="max-w-3xl mx-auto flex items-center justify-between">
             <Button variant="ghost" onClick={prevStep} disabled={wizardStep === 1} className={wizardStep === 1 ? 'opacity-0' : ''}>
               <ChevronLeft size={20} /> Back
