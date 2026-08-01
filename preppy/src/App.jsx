@@ -234,7 +234,7 @@ const Step4Syllabus = ({ data, updateData }) => {
   const addTopic = (subjectId) => {
     updateData(data.map(s => {
       if (s.id === subjectId) {
-        return { ...s, topics: [...s.topics, { id: generateId(), name: 'New Topic', confidence: 'Average', subtopics: [] }] };
+        return { ...s, topics: [...s.topics, { id: generateId(), name: 'New Topic', confidence: 'Average', subtopics: [{ id: generateId(), name: 'New Subtopic', hours: 1 }] }] };
       }
       return s;
     }));
@@ -253,7 +253,7 @@ const Step4Syllabus = ({ data, updateData }) => {
   const addSubtopic = (subjectId, topicId) => {
     updateData(data.map(s => s.id === subjectId ? {
       ...s, topics: s.topics.map(t => t.id === topicId ? {
-        ...t, subtopics: [...t.subtopics, { id: generateId(), name: 'New Subtopic' }]
+        ...t, subtopics: [...t.subtopics, { id: generateId(), name: 'New Subtopic', hours: 1 }]
       } : t)
     } : s));
   };
@@ -262,6 +262,14 @@ const Step4Syllabus = ({ data, updateData }) => {
     updateData(data.map(s => s.id === subjectId ? {
       ...s, topics: s.topics.map(t => t.id === topicId ? {
         ...t, subtopics: t.subtopics.map(st => st.id === subtopicId ? { ...st, name } : st)
+      } : t)
+    } : s));
+  };
+
+  const updateSubtopicHours = (subjectId, topicId, subtopicId, hours) => {
+    updateData(data.map(s => s.id === subjectId ? {
+      ...s, topics: s.topics.map(t => t.id === topicId ? {
+        ...t, subtopics: t.subtopics.map(st => st.id === subtopicId ? { ...st, hours } : st)
       } : t)
     } : s));
   };
@@ -276,7 +284,7 @@ const Step4Syllabus = ({ data, updateData }) => {
 
   return (
     <div className="space-y-6">
-      <Mascot message="Time to break it down! Add your subjects, topics, and specific subtopics. The more detailed, the better the plan." />
+      <Mascot message="Time to break it down! Add your subjects, topics, and specific subtopics — and set how many hours each subtopic needs. I'll pace the plan around that." />
       
       {data.map((subject, sIdx) => (
         <Card key={subject.id} className="p-0 overflow-hidden border-2 border-slate-100">
@@ -313,6 +321,17 @@ const Step4Syllabus = ({ data, updateData }) => {
                         className="text-sm bg-transparent border-b border-dashed border-slate-300 text-slate-600 outline-none w-full py-1 focus:border-blue-400"
                         placeholder="Specific subtopic..."
                       />
+                      <div className="flex items-center gap-1 shrink-0 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                        <input
+                          type="number"
+                          min="0.5"
+                          step="0.5"
+                          value={subtopic.hours ?? 1}
+                          onChange={(e) => updateSubtopicHours(subject.id, topic.id, subtopic.id, parseFloat(e.target.value) || 0.5)}
+                          className="w-12 text-sm text-right bg-transparent outline-none text-slate-600"
+                        />
+                        <span className="text-xs text-slate-400">hrs</span>
+                      </div>
                       <button onClick={() => removeSubtopic(subject.id, topic.id, subtopic.id)} className="text-slate-300 hover:text-red-400"><XCircle size={14} /></button>
                     </div>
                   ))}
@@ -346,7 +365,7 @@ const Step5Confidence = ({ data, updateData }) => {
 
   return (
     <div className="space-y-6">
-      <Mascot message="Be honest! How confident do you feel about these topics? I'll schedule more time for the weak ones early on." />
+      <Mascot message="Be honest! How confident do you feel about these topics? I'll bump the weak ones earlier in the queue, but the hours you set per subtopic stay the same." />
       <div className="space-y-6">
         {data.map(subject => (
           <div key={subject.id} className="space-y-3">
@@ -447,12 +466,13 @@ const generateScheduleAlgorithm = (appState) => {
     return [];
   }
 
-  // 1. Flatten Syllabus into queue
-  let studyQueue = [];
-  syllabus.forEach(subject => {
+  // 1. Flatten syllabus into a per-subject queue, using the hours the user set on each
+  // subtopic directly as its duration — no more guessing from confidence.
+  const perSubjectQueues = syllabus.map(subject => {
+    const items = [];
     subject.topics.forEach(topic => {
       topic.subtopics.forEach(subtopic => {
-        studyQueue.push({
+        items.push({
           id: generateId(),
           subjectId: subject.id,
           subjectName: subject.name,
@@ -461,19 +481,38 @@ const generateScheduleAlgorithm = (appState) => {
           subtopicId: subtopic.id,
           subtopicName: subtopic.name,
           confidence: topic.confidence,
-          // Estimated minutes based on confidence
-          durationReq: topic.confidence === 'Weak' ? 120 : (topic.confidence === 'Average' ? 90 : 60),
+          // User-specified hours drive duration directly.
+          durationReq: Math.round((subtopic.hours ?? 1) * 60),
           type: 'study'
         });
       });
     });
+    return items;
+  }).filter(items => items.length > 0);
+
+  if (perSubjectQueues.length === 0) return [];
+
+  // 2. Interleave subjects round-robin so the plan works through a bit of everything
+  // each day rather than finishing one subject before starting the next. Within a
+  // subject, weaker topics are nudged earlier — but this only reorders, it never
+  // changes how long a subtopic takes.
+  const confidenceWeight = { 'Weak': 3, 'Average': 2, 'Strong': 1 };
+  perSubjectQueues.forEach(items => {
+    items.sort((a, b) => (confidenceWeight[b.confidence] || 2) - (confidenceWeight[a.confidence] || 2));
   });
 
-  if (studyQueue.length === 0) return [];
-
-  // Sort queue: Weak first, then interleave subjects slightly (simplified: just by confidence for now)
-  const confidenceWeight = { 'Weak': 3, 'Average': 2, 'Strong': 1 };
-  studyQueue.sort((a, b) => confidenceWeight[b.confidence] - confidenceWeight[a.confidence]);
+  let studyQueue = [];
+  const cursors = perSubjectQueues.map(() => 0);
+  let remaining = perSubjectQueues.reduce((sum, items) => sum + items.length, 0);
+  while (remaining > 0) {
+    for (let i = 0; i < perSubjectQueues.length; i++) {
+      if (cursors[i] < perSubjectQueues[i].length) {
+        studyQueue.push(perSubjectQueues[i][cursors[i]]);
+        cursors[i]++;
+        remaining--;
+      }
+    }
+  }
 
   // 2. Pre-calculate Daily Capacity Map for EVERY day from tomorrow through the exam
   const daysMap = new Map(); // timestamp -> { totalMins, usedMins, date }
@@ -620,15 +659,17 @@ const generateScheduleAlgorithm = (appState) => {
       }
     }
 
-    // -- Safety net: any day that still has real free time left gets filled with
-    // rotating practice, so the calendar stays populated all the way to the exam --
-    if (remainingCapacity() >= 30 && coveredPool.length > 0) {
+    // -- Final revision phase: once we're inside the buffer window right before the
+    // exam, use any leftover time for rotating revision. Outside the buffer window,
+    // a day with no new subtopics, no mock, and no scheduled revision is simply left
+    // free rather than auto-filled with generic "practice" every time.
+    if (isBufferPeriod && remainingCapacity() >= 30 && coveredPool.length > 0) {
       const topic = coveredPool[revisionRotation % coveredPool.length];
       revisionRotation++;
-      const alloc = Math.min(isBufferPeriod ? 90 : 60, remainingCapacity());
+      const alloc = Math.min(90, remainingCapacity());
       schedule.push({
         eventId: generateId(), type: 'revision', date: dayInfo.date.toISOString(), duration: alloc,
-        title: isBufferPeriod ? 'Final Revision Phase' : 'Practice & Review', status: 'pending',
+        title: 'Final Revision Phase', status: 'pending',
         subjectName: topic.subjectName, topicName: `Revisit: ${topic.subtopicName}`
       });
       dayInfo.usedMins += alloc;
@@ -1027,7 +1068,7 @@ export default function App() {
   const [availability, setAvailability] = useLocalStorage('preppy_avail', { monday: 2, tuesday: 2, wednesday: 2, thursday: 2, friday: 2, saturday: 4, sunday: 4 });
   const [commitments, setCommitments] = useLocalStorage('preppy_commitments', []);
   const [syllabus, setSyllabus] = useLocalStorage('preppy_syllabus', [
-    { id: generateId(), name: 'Math', topics: [{ id: generateId(), name: 'Calculus', confidence: 'Average', subtopics: [{ id: generateId(), name: 'Derivatives' }] }] }
+    { id: generateId(), name: 'Math', topics: [{ id: generateId(), name: 'Calculus', confidence: 'Average', subtopics: [{ id: generateId(), name: 'Derivatives', hours: 1 }] }] }
   ]);
   const [preferences, setPreferences] = useLocalStorage('preppy_prefs', { bufferDays: 7, revisionStyle: 'Weekly Review', mockFrequency: 'Weekly Mini Tests' });
   const [schedule, setSchedule] = useLocalStorage('preppy_schedule', []);
@@ -1095,9 +1136,9 @@ export default function App() {
   );
 
   const renderWizard = () => (
-    <div className="h-screen bg-slate-50/50 flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-slate-50/50 flex flex-col">
       {/* Wizard Header Progress */}
-      <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shrink-0 z-20">
+      <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-20">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center text-xl">🐷</div>
           <span className="font-bold text-slate-800 text-lg">Preppy Setup</span>
@@ -1111,9 +1152,9 @@ export default function App() {
       </header>
 
       {/* Wizard Content Area */}
-      <main className="flex-1 min-h-0 max-w-3xl w-full mx-auto p-6 md:p-12 overflow-y-auto">
+      <main className="flex-1 max-w-3xl w-full mx-auto p-6 md:p-12">
         {isGenerating ? (
-          <div className="h-full flex flex-col items-center justify-center space-y-6 text-center animate-in fade-in duration-500">
+          <div className="py-24 flex flex-col items-center justify-center space-y-6 text-center animate-in fade-in duration-500">
             <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center text-4xl animate-pulse">🐷</div>
             <h2 className="text-2xl font-bold text-slate-800">Crunching the numbers...</h2>
             <p className="text-slate-500 max-w-md">I'm taking your syllabus, analyzing your confidence levels, weaving around your commitments, and building the perfect schedule.</p>
@@ -1132,7 +1173,7 @@ export default function App() {
 
       {/* Wizard Footer Navigation */}
       {!isGenerating && (
-        <footer className="bg-white border-t border-slate-100 p-4 shrink-0 z-20">
+        <footer className="bg-white border-t border-slate-100 p-4 sticky bottom-0 z-20">
           <div className="max-w-3xl mx-auto flex items-center justify-between">
             <Button variant="ghost" onClick={prevStep} disabled={wizardStep === 1} className={wizardStep === 1 ? 'opacity-0' : ''}>
               <ChevronLeft size={20} /> Back
